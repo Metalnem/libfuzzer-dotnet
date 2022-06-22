@@ -7,6 +7,9 @@
 #include "unistd.h"
 #include <sys/shm.h>
 
+#define _STR(x) #x
+#define STR(x) _STR(x)
+
 #define MAP_SIZE (1 << 16)
 #define DATA_SIZE (1 << 20)
 
@@ -15,6 +18,8 @@
 #define LEN_FLD_SIZE 4
 
 #define SHM_ID_VAR "__LIBFUZZER_SHM_ID"
+#define CTL_FD_VAR "__LIBFUZZER_CONTROL_PIPE_ID"
+#define ST_FD_VAR "__LIBFUZZER_STATUS_PIPE_ID"
 
 __attribute__((weak, section("__libfuzzer_extra_counters")))
 uint8_t extra_counters[MAP_SIZE];
@@ -141,7 +146,17 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
 
 		if (setenv(SHM_ID_VAR, shm_str, 1))
 		{
-			die_sys("setenv() failed");
+			die_sys("setenv() failed setting shared memory ID");
+		}
+
+		if (setenv(CTL_FD_VAR, STR(CTL_FD), 1))
+		{
+			die_sys("setenv() failed setting control pipe ID");
+		}
+
+		if (setenv(ST_FD_VAR, STR(ST_FD), 1))
+		{
+			die_sys("setenv() failed setting status pipe ID");
 		}
 
 		if (target_arg)
