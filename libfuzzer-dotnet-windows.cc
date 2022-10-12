@@ -175,12 +175,16 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     }
     if (target_arg)
     {
-        char *temp_target = new char[strlen(target_path) + strlen(target_arg) + 1];
+        char *temp_target = new char[strlen(target_path) + 1 + strlen(target_arg) + 1];
         strcpy(temp_target, target_path);
-        strcpy(temp_target + strlen(target_path), target_arg);
+        temp_target[strlen(target_path)] = ' ';
+        strcpy(temp_target + strlen(target_path) + 1, target_arg);
         target_for_process = temp_target;
     }
-    target_for_process = target_path;
+    else
+    {
+        target_for_process = target_path;
+    }
     PROCESS_INFORMATION pi;
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(si));
