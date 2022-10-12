@@ -94,7 +94,7 @@ static void parse_flags(int argc, char **argv)
     }
 }
 
-static char** tokenize(const char* str, const char* delimiter = ",");
+static void tokenize(const char *str, char **tokens, const char *delimiter = ",");
 
 // Start the .NET child process and initialize two pipes and one shared
 // memory segment for the communication between the parent and the child.
@@ -170,7 +170,9 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
 
         if (target_args)
         {
-            char** args = tokenize(target_args);
+            char **args = new char *[100];
+            args[0] = (char*)"";
+            tokenize(target_args, args + 1);
             execvp(target_path, args);
         }
         else if (target_arg)
@@ -280,27 +282,16 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     return 0;
 }
 
-static char **tokenize(const char *str, const char *delimiter)
+static void tokenize(const char *str, char **tokens, const char *delimiter)
 {
-    char *rest = new char[strlen(str) + 1];
-    strcpy(rest, str);
-    int n = 0;
-
-    while (strtok_r(rest, delimiter, &rest))
-    {
-        n++;
-    }
-
-    char **tokens = new char *[n + 1];  // must be NULL-terminated, cf. https://linux.die.net/man/3/execlp
-    int i = 0;
-    strcpy(rest, str);
     char *token;
+    int i = 0;
+    char *rest = new char[strlen(str) + 1];     // must be NULL-terminated, cf. https://linux.die.net/man/3/execlp
+    strcpy(rest, str);
 
     while ((token = strtok_r(rest, delimiter, &rest)))
     {
         tokens[i++] = token;
     }
     tokens[i] = NULL;
-
-    return tokens;
 }
