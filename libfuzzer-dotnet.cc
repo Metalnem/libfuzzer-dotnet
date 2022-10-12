@@ -5,6 +5,9 @@
 #include "stdlib.h"
 #include "string.h"
 #include "unistd.h"
+#include <sstream>
+#include <vector>
+#include <string>
 #include <sys/shm.h>
 
 #define _STR(x) #x
@@ -94,7 +97,7 @@ static void parse_flags(int argc, char **argv)
     }
 }
 
-static void tokenize(const char *str, char **tokens, const char *delimiter = ",");
+static char **get_arguments(const char *str, const char delimiter = ',');
 
 // Start the .NET child process and initialize two pipes and one shared
 // memory segment for the communication between the parent and the child.
@@ -170,9 +173,7 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
 
         if (target_args)
         {
-            char **args = new char *[100];
-            args[0] = (char*)"";
-            tokenize(target_args, args + 1);
+            char** args = get_arguments(target_args);
             execvp(target_path, args);
         }
         else if (target_arg)
@@ -282,16 +283,34 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     return 0;
 }
 
-static void tokenize(const char *str, char **tokens, const char *delimiter)
+static char **get_arguments(const char *str, const char delimiter)
 {
-    char *token;
-    int i = 0;
-    char *rest = new char[strlen(str) + 1];     // must be NULL-terminated, cf. https://linux.die.net/man/3/execlp
-    strcpy(rest, str);
+    using namespace std;
 
-    while ((token = strtok_r(rest, delimiter, &rest)))
+    stringstream ss(str);
+    vector<string> tokens;
+
+    while (ss.good())
     {
-        tokens[i++] = token;
+        string token;
+        getline(ss, token, delimiter);
+        tokens.push_back(token);
     }
-    tokens[i] = NULL;
+
+    size_t size = tokens.size();
+    size_t tokenCount = size + 2;
+    char **args = new char *[tokenCount];
+    args[0] = (char*)"";
+    args[tokenCount - 1] = NULL;    // must be NULL-terminated, cf. https://linux.die.net/man/3/execlp
+
+    for (size_t i = 0; i < size; ++i)
+    {
+        string tmp = tokens[i];
+        char *arg = new char[tmp.length() + 1];
+        tmp.copy(arg, tmp.length());
+        arg[tmp.length()] = '\0';
+        args[i + 1] = arg;
+    }
+
+    return args;
 }
