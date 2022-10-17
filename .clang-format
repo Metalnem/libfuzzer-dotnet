@@ -1,0 +1,4 @@
+BasedOnStyle: Microsoft
+IndentWidth: 4
+UseCRLF: false
+ColumnLimit: 0
