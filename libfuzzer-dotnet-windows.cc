@@ -33,10 +33,11 @@
 __declspec(allocate(".data$__libfuzzer_extra_counters")) uint8_t __libfuzzer_extra_counters[64 * 1024];
 
 static const char *target_path_name = "--target_path";
-static const char *target_arg_name = "--target_arg";
+static const char *target_arg_name  = "--target_arg";
+static const char *target_args_name = "--target_args";
 
 static const char *target_path;
-static const char *target_arg;
+static const char *target_args;
 static const char *target_for_process;
 
 static HANDLE hMemFile;
@@ -80,8 +81,8 @@ static const char *read_flag_value(const char *param, const char *name)
     return NULL;
 }
 
-// Read target_path (the path to .NET executable) and target_arg (optional command
-// line argument that can be passed to .NET executable) from the command line parameters.
+// Read target_path (the path to .NET executable) and target_args (optional command
+// line arguments that can be passed to .NET executable) from the command line parameters.
 static void parse_flags(int argc, char **argv)
 {
     for (int i = 0; i < argc; ++i)
@@ -93,11 +94,29 @@ static void parse_flags(int argc, char **argv)
             target_path = read_flag_value(param, target_path_name);
         }
 
-        if (!target_arg)
+        if (!target_args)
         {
-            target_arg = read_flag_value(param, target_arg_name);
+            target_args = read_flag_value(param, target_args_name);
+
+            if (!target_args)
+            {
+                target_args = read_flag_value(param, target_arg_name);
+            }
         }
     }
+}
+
+static int replace_char(char *str, char orig, char replacement)
+{
+    int count = 0;
+
+    while ((str = strchr(str, orig)) != NULL)
+    {
+        *str++ = replacement;
+        count++;
+    }
+
+    return count;
 }
 
 // Start the .NET child process and initialize two pipes and one shared
@@ -173,14 +192,24 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     {
         die_sys("SetEnvironmentVariable() failed setting status pipe ID");
     }
-    if (target_arg)
+    if (target_args)
     {
-        char *temp_target = new char[strlen(target_path) + strlen(target_arg) + 1];
-        strcpy(temp_target, target_path);
-        strcpy(temp_target + strlen(target_path), target_arg);
+        char* temp_args = new char[strlen(target_args) + 1];
+        strcpy_s(temp_args, strlen(target_args) + 1, target_args);
+        replace_char(temp_args, ',', ' ');
+
+        char* temp_target = new char[strlen(target_path) + 1 + strlen(temp_args) + 1];
+        strcpy_s(temp_target, strlen(target_path) + 1, target_path);
+        temp_target[strlen(target_path)] = ' ';
+        strcpy_s(temp_target + strlen(target_path) + 1, strlen(temp_args) + 1, temp_args);
         target_for_process = temp_target;
+
+        delete[] temp_args;
     }
-    target_for_process = target_path;
+    else
+    {
+        target_for_process = target_path;
+    }
     PROCESS_INFORMATION pi;
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(si));
