@@ -173,6 +173,27 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     {
         die_sys("SetEnvironmentVariable() failed setting status pipe ID");
     }
+
+    // Create a job object to manage the fuzzer process tree.
+    //
+    // We will configure it to do the following:
+    // - Automatically add new processes to the job on calls to `CreateProcess()`
+    // - Kill all job processes when the last job handle is closed
+    //
+    // Since this process will hold the only job handle, the target child process
+    // will be terminated even on abnormal exit of the parent harness.
+    SECURITY_ATTRIBUTES job_attrs = {
+        sizeof(SECURITY_ATTRIBUTES),
+        NULL,
+        TRUE, // Inherit job handle
+    };
+    HANDLE job = CreateJobObjectA(&job_attrs, NULL);
+
+    // Terminate other (child) processes when all job handles are closed.
+    JOBOBJECT_BASIC_LIMIT_INFORMATION li = {0};
+    li.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    SetInformationJobObject(job, JobObjectBasicLimitInformation, &li, sizeof(li));
+
     if (target_arg)
     {
         char *temp_target = new char[strlen(target_path) + strlen(target_arg) + 1];
