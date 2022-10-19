@@ -208,6 +208,8 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
     }
 
+    // Assign the current process to the job. Later calls to `CreateProcess()` will automatically
+    // assign the created child processes to the job object.
     if (!AssignProcessToJobObject(job, GetCurrentProcess()))
     {
         die_sys("failed to assign `libfuzzer-dotnet` process to job");
