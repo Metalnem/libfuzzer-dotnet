@@ -182,10 +182,15 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     //
     // Since this process will hold the only job handle, the target child process
     // will be terminated even on abnormal exit of the parent harness.
+
+    // Disable child inheritance of the job handle. This ensures that the current process
+    // holds the _only_ handle, so on exit, all job processes will be killed.
+    BOOL inherit_job_handle = FALSE;
+
     SECURITY_ATTRIBUTES job_attrs = {
         sizeof(SECURITY_ATTRIBUTES),
         NULL,
-        FALSE, // Don't inherit job handle
+        inherit_job_handle,
     };
     HANDLE job = CreateJobObjectA(&job_attrs, NULL);
 
