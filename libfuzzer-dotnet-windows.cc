@@ -185,7 +185,7 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     SECURITY_ATTRIBUTES job_attrs = {
         sizeof(SECURITY_ATTRIBUTES),
         NULL,
-        TRUE, // Inherit job handle
+        FALSE, // Don't inherit job handle
     };
     HANDLE job = CreateJobObjectA(&job_attrs, NULL);
 
