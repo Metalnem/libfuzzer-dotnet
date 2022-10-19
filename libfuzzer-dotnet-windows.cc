@@ -182,17 +182,38 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     //
     // Since this process will hold the only job handle, the target child process
     // will be terminated even on abnormal exit of the parent harness.
+
+    // Disable child inheritance of the job handle. This ensures that the current process
+    // holds the _only_ handle, so on exit, all job processes will be killed.
+    BOOL inherit_job_handle = FALSE;
+
     SECURITY_ATTRIBUTES job_attrs = {
         sizeof(SECURITY_ATTRIBUTES),
         NULL,
-        TRUE, // Inherit job handle
+        inherit_job_handle,
     };
     HANDLE job = CreateJobObjectA(&job_attrs, NULL);
 
     // Terminate other (child) processes when all job handles are closed.
     JOBOBJECT_BASIC_LIMIT_INFORMATION li = {0};
     li.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    SetInformationJobObject(job, JobObjectBasicLimitInformation, &li, sizeof(li));
+
+    // Setting `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` requires the use of an enclosing
+    // `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` struct.
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION eli = {0};
+    eli.BasicLimitInformation = li;
+
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &eli, sizeof(eli)))
+    {
+        die_sys("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
+    }
+
+    // Assign the current process to the job. Later calls to `CreateProcess()` will automatically
+    // assign the created child processes to the job object.
+    if (!AssignProcessToJobObject(job, GetCurrentProcess()))
+    {
+        die_sys("failed to assign `libfuzzer-dotnet` process to job");
+    }
 
     if (target_arg)
     {
