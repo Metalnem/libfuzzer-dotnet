@@ -192,7 +192,16 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     // Terminate other (child) processes when all job handles are closed.
     JOBOBJECT_BASIC_LIMIT_INFORMATION li = {0};
     li.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    SetInformationJobObject(job, JobObjectBasicLimitInformation, &li, sizeof(li));
+
+    // Setting `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` requires the use of an enclosing
+    // `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` struct.
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION eli = {0};
+    eli.BasicLimitInformation = li;
+
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &eli, sizeof(eli)))
+    {
+        die_sys("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
+    }
 
     if (target_arg)
     {
