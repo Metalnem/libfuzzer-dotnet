@@ -203,6 +203,11 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
     }
 
+    if (!AssignProcessToJobObject(job, GetCurrentProcess()))
+    {
+        die_sys("failed to assign `libfuzzer-dotnet` process to job");
+    }
+
     if (target_arg)
     {
         char *temp_target = new char[strlen(target_path) + strlen(target_arg) + 1];
