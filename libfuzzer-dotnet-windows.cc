@@ -134,11 +134,23 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("CreatePipe() failed");
     }
 
-    TCHAR sharedMemName[] = TEXT("LIBFUZZER_DOTNET_SHMEM");
-    hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
-    if (hMemFile == NULL)
+    // do while is for the case you want to run multiple fuzzers but with different shared memory regions
+    int sharedMemNameCtr = 0;
+    //26 = sizeof("LIBFUZZER_DOTNET_SHMEMXXX") + 1;
+    TCHAR sharedMemName[26];
+    do
     {
-        die_sys("CreateFileMapping() failed");
+        StringCchPrintfA(sharedMemName, 25, "LIBFUZZ_DOTNET_SHMEM%d", sharedMemNameCtr);
+        sharedMemNameCtr++;
+        hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
+        if (hMemFile == NULL)
+        {
+            die_sys("CreateFileMapping() failed");
+        }
+    } while (GetLastError()==ERROR_ALREADY_EXISTS && sharedMemNameCtr < 999);
+    if (sharedMemNameCtr == 999)
+    {
+        die_sys("Could not get shmem!");
     }
 
     atexit(close_shm);
