@@ -2,7 +2,7 @@ name: Release libfuzzer-dotnet
 
 on:
   push:
-    branches: ["main"]
+    branches: ["master"]
 
 jobs:
   build-windows:
