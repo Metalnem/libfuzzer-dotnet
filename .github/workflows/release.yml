@@ -1,0 +1,60 @@
+name: Release libfuzzer-dotnet
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet-windows.exe
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+          path: libfuzzer-dotnet-windows.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-ubuntu
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+          path: libfuzzer-dotnet-ubuntu
+
+  release:
+    runs-on: windows-latest
+    needs: [build-windows, build-linux]
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+      - name: Tag
+        id: tag
+        run: |
+          $tag = "v" + (Get-Date).ToString("yyyy.MM.dd.HHmm")
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+
+          git config user.name "${GITHUB_REPOSITORY_OWNER}"
+          git config user.email "${GITHUB_REPOSITORY_OWNER}@users.noreply.github.com"
+
+          git tag -a $tag -m $tag ${GITHUB_SHA}
+          git push origin $tag
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            libfuzzer-dotnet-windows.exe
+            libfuzzer-dotnet-ubuntu
+          tag_name: ${{ steps.tag.outputs.tag }}
