@@ -3,6 +3,8 @@ name: Release libfuzzer-dotnet
 on:
   push:
     branches: ["master"]
+    paths-ignore:
+      - '.github/**'
 
 jobs:
   build-windows:

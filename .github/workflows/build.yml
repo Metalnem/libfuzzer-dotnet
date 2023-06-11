@@ -1,0 +1,22 @@
+name: Build libfuzzer-dotnet
+
+on:
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet-windows.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-ubuntu
