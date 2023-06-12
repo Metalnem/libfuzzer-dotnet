@@ -10,6 +10,9 @@
 #include <string>
 #include <tchar.h>
 #include <windows.h>
+#include <rpcdce.h>
+
+#pragma comment(lib, "rpcrt4.lib")
 
 #ifdef __cplusplus
 #define FUZZ_EXPORT extern "C" __declspec(dllexport)
@@ -134,23 +137,15 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("CreatePipe() failed");
     }
 
-    // do while is for the case you want to run multiple fuzzers but with different shared memory regions
-    int sharedMemNameCtr = 0;
-    //26 = sizeof("LIBFUZZER_DOTNET_SHMEMXXX") + 1;
-    TCHAR sharedMemName[26];
-    do
+    UUID uuid;
+    UuidCreate(&uuid);
+    TCHAR *sharedMemName;
+    UuidToString(&uuid, (unsigned char **) &sharedMemName);
+
+    hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
+    if (hMemFile == NULL)
     {
-        StringCchPrintfA(sharedMemName, 25, "LIBFUZZ_DOTNET_SHMEM%d", sharedMemNameCtr);
-        sharedMemNameCtr++;
-        hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
-        if (hMemFile == NULL)
-        {
-            die_sys("CreateFileMapping() failed");
-        }
-    } while (GetLastError()==ERROR_ALREADY_EXISTS && sharedMemNameCtr < 999);
-    if (sharedMemNameCtr == 999)
-    {
-        die_sys("Could not get shmem!");
+        die_sys("CreateFileMapping() failed");
     }
 
     atexit(close_shm);
