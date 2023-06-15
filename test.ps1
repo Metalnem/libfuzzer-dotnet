@@ -1,10 +1,10 @@
-dotnet publish tests\Library.Fuzz -c release -o out -r win10-x64 --self-contained
-sharpfuzz out\Library.dll
+dotnet publish tests/Library.Fuzz -c release -o out
+sharpfuzz out/Library.dll
 
 mkdir corpus
 $outputPath = "output.txt"
 
-.\libfuzzer-dotnet-windows --target_path=out\Library.Fuzz.exe corpus 2>&1 `
+.\libfuzzer-dotnet --target_path=dotnet --target_arg=out/Library.Fuzz.dll corpus 2>&1 `
 | Tee-Object -FilePath $outputPath
 
 $output = Get-Content -Path $outputPath -Raw

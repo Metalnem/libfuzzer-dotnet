@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet-windows.exe
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet.exe
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
@@ -22,10 +22,19 @@ jobs:
       - name: Run libFuzzer tests
         run: .\test.ps1
 
-  build-linux:
+  build-ubuntu:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-ubuntu
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7.0
+      - name: Install SharpFuzz
+        run: dotnet tool install --global SharpFuzz.CommandLine
+      - name: Run libFuzzer tests
+        shell: pwsh
+        run: .\test.ps1
