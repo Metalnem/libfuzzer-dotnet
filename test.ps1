@@ -1,3 +1,5 @@
+dotnet tool install --global SharpFuzz.CommandLine
+
 dotnet publish tests/Library.Fuzz -c release -o out
 sharpfuzz out/Library.dll
 

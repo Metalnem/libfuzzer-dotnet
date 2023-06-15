@@ -2,6 +2,7 @@ name: Build libfuzzer-dotnet
 
 on:
   workflow_dispatch:
+  workflow_call:
   pull_request:
     branches: ["master"]
 
@@ -12,15 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet.exe
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet-windows.exe
+      - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 7.0
-      - name: Install SharpFuzz
-        run: dotnet tool install --global SharpFuzz.CommandLine
       - name: Run libFuzzer tests
-        run: .\test.ps1
+        run: cp libfuzzer-dotnet-windows.exe libfuzzer-dotnet.exe && .\test.ps1
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+          path: libfuzzer-dotnet-windows.exe
 
   build-ubuntu:
     runs-on: ubuntu-latest
@@ -28,13 +30,39 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-ubuntu
+      - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 7.0
-      - name: Install SharpFuzz
-        run: dotnet tool install --global SharpFuzz.CommandLine
       - name: Run libFuzzer tests
         shell: pwsh
-        run: .\test.ps1
+        run: cp libfuzzer-dotnet-ubuntu libfuzzer-dotnet && .\test.ps1
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+          path: libfuzzer-dotnet-ubuntu
+
+  build-debian:
+    runs-on: ubuntu-latest
+    container: debian:bullseye
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download LLVM
+        run: |
+          apt-get update && apt-get install -y lsb-release wget software-properties-common gnupg
+          add-apt-repository 'deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-16 main'
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          apt-get update && apt-get install -y clang-16 libfuzzer-16-dev llvm-16 llvm-16-dev
+      - name: Build
+        run: clang++-16 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-debian
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7.0
+      - name: Run libFuzzer tests
+        shell: pwsh
+        run: cp libfuzzer-dotnet-debian libfuzzer-dotnet && .\test.ps1
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libfuzzer-dotnet
+          path: libfuzzer-dotnet-debian
