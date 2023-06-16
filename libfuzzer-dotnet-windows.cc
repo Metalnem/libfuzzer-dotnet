@@ -56,7 +56,10 @@ static void die(const char *msg)
 
 static void die_sys(const char *msg)
 {
-    printf("%s: %s\n", msg, strerror(errno));
+    char error_msg[256];
+    strerror_s(error_msg, sizeof(error_msg), errno);
+
+    printf("%s: %s\n", msg, error_msg);
     exit(1);
 }
 
@@ -104,7 +107,6 @@ static void parse_flags(int argc, char **argv)
 // memory segment for the communication between the parent and the child.
 FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
 {
-
     int32_t status = 0;
     DWORD dwRead = 0;
     DWORD dwWrite = 0;
@@ -217,10 +219,13 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
 
     if (target_arg)
     {
-        char *temp_target = new char[strlen(target_path) + 1 + strlen(target_arg) + 1];
-        strcpy(temp_target, target_path);
-        temp_target[strlen(target_path)] = ' ';
-        strcpy(temp_target + strlen(target_path) + 1, target_arg);
+        size_t target_path_len = strlen(target_path);
+        size_t target_arg_len = strlen(target_arg);
+
+        char *temp_target = new char[target_path_len + 1 + target_arg_len + 1];
+        strcpy_s(temp_target, target_path_len + 1, target_path);
+        temp_target[target_path_len] = ' ';
+        strcpy_s(temp_target + target_path_len + 1, target_arg_len + 1, target_arg);
         target_for_process = temp_target;
     }
     else
