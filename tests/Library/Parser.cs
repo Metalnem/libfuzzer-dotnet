@@ -17,7 +17,7 @@ public static class Parser
         if (span.Length > 10 && span[10] == '\'')
         if (span.Length > 11 && span[11] == 's')
         {
-            throw new Exception("Like a pound of bacon");
+            Environment.FailFast("Everything is on fire");
         }
     }
 }
