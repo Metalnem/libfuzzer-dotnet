@@ -25,7 +25,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: libfuzzer-dotnet
-          path: libfuzzer-dotnet-windows.exe
+          path: libfuzzer-dotnet-windows.*
 
   build-ubuntu:
     runs-on: ubuntu-latest
