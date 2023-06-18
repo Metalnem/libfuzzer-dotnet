@@ -39,8 +39,6 @@ jobs:
         with:
           files: |
             libfuzzer-dotnet-windows.exe
-            libfuzzer-dotnet-windows.lib
-            libfuzzer-dotnet-windows.exp
             libfuzzer-dotnet-ubuntu
             libfuzzer-dotnet-debian
           tag_name: ${{ steps.tag.outputs.tag }}
