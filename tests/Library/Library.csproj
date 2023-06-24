@@ -4,6 +4,11 @@
     <TargetFramework>net472</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+  </ItemGroup>
 
 </Project>
