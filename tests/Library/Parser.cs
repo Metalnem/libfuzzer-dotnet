@@ -1,5 +1,7 @@
 ﻿namespace Library;
 
+using System;
+
 public static class Parser
 {
     public static void Parse(ReadOnlySpan<byte> span)

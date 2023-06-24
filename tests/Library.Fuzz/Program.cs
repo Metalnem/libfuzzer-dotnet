@@ -1,4 +1,5 @@
-﻿using SharpFuzz;
+﻿using System;
+using SharpFuzz;
 
 namespace Library.Fuzz;
 
