@@ -10,6 +10,9 @@
 #include <string>
 #include <tchar.h>
 #include <windows.h>
+#include <rpcdce.h>
+
+#pragma comment(lib, "rpcrt4.lib")
 
 #ifdef __cplusplus
 #define FUZZ_EXPORT extern "C" __declspec(dllexport)
@@ -136,7 +139,17 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("CreatePipe() failed");
     }
 
-    TCHAR sharedMemName[] = TEXT("LIBFUZZER_DOTNET_SHMEM");
+    UUID uuid;
+    if (RPC_S_OK != UuidCreate(&uuid))
+    {
+        die("Could not create an UUID");
+    }
+    TCHAR *sharedMemName;
+    if (RPC_S_OK != UuidToStringA(&uuid, (unsigned char **)&sharedMemName))
+    {
+        die("Could not convert UUID to a string\n");
+    }
+
     hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
     if (hMemFile == NULL)
     {
