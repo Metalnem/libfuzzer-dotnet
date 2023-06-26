@@ -140,9 +140,15 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     }
 
     UUID uuid;
-    UuidCreate(&uuid);
+    if (RPC_S_OK != UuidCreate(&uuid))
+    {
+        die("Could not create an UUID");
+    }
     TCHAR *sharedMemName;
-    UuidToString(&uuid, (unsigned char **) &sharedMemName);
+    if (RPC_S_OK != UuidToStringA(&uuid, (unsigned char **)&sharedMemName))
+    {
+        die("Could not convert UUID to a string\n");
+    }
 
     hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
     if (hMemFile == NULL)
