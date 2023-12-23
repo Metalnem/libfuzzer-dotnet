@@ -7,7 +7,7 @@ on:
     branches: ["master"]
 
 env:
-  dotnet-version: 7.0
+  dotnet-version: 8.0
 
 jobs:
   build-windows:
