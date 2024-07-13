@@ -28,7 +28,7 @@ jobs:
           path: libfuzzer-dotnet-windows.exe
 
   build-ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v3
@@ -46,7 +46,7 @@ jobs:
           path: libfuzzer-dotnet-ubuntu
 
   build-debian:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: debian:bullseye
 
     steps:
