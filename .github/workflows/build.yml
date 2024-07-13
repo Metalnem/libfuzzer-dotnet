@@ -22,9 +22,9 @@ jobs:
           dotnet-version: ${{ env.dotnet-version }}
       - name: Run libFuzzer tests
         run: cp libfuzzer-dotnet-windows.exe libfuzzer-dotnet.exe && .\test.ps1
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-windows
           path: libfuzzer-dotnet-windows.exe
 
   build-ubuntu:
@@ -40,9 +40,9 @@ jobs:
       - name: Run libFuzzer tests
         shell: pwsh
         run: cp libfuzzer-dotnet-ubuntu libfuzzer-dotnet && .\test.ps1
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-ubuntu
           path: libfuzzer-dotnet-ubuntu
 
   build-debian:
@@ -59,7 +59,7 @@ jobs:
           apt-get update && apt-get install -y clang-18 libfuzzer-18-dev llvm-18 llvm-18-dev
       - name: Build
         run: clang++-18 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-debian
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-debian
           path: libfuzzer-dotnet-debian
