@@ -14,52 +14,52 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build
         run: clang -Werror -fsanitize=fuzzer libfuzzer-dotnet-windows.cc -o libfuzzer-dotnet-windows.exe
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.dotnet-version }}
       - name: Run libFuzzer tests
         run: cp libfuzzer-dotnet-windows.exe libfuzzer-dotnet.exe && .\test.ps1
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-windows
           path: libfuzzer-dotnet-windows.exe
 
   build-ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build
         run: clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-ubuntu
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.dotnet-version }}
       - name: Run libFuzzer tests
         shell: pwsh
         run: cp libfuzzer-dotnet-ubuntu libfuzzer-dotnet && .\test.ps1
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-ubuntu
           path: libfuzzer-dotnet-ubuntu
 
   build-debian:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: debian:bullseye
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download LLVM
         run: |
           apt-get update && apt-get install -y lsb-release wget software-properties-common gnupg
-          add-apt-repository 'deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-16 main'
+          add-apt-repository 'deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main'
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-          apt-get update && apt-get install -y clang-16 libfuzzer-16-dev llvm-16 llvm-16-dev
+          apt-get update && apt-get install -y clang-18 libfuzzer-18-dev llvm-18 llvm-18-dev
       - name: Build
-        run: clang++-16 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-debian
-      - uses: actions/upload-artifact@v3
+        run: clang++-18 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-debian
+      - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          name: libfuzzer-dotnet-debian
           path: libfuzzer-dotnet-debian

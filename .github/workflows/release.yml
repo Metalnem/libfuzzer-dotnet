@@ -20,22 +20,23 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: libfuzzer-dotnet
+          pattern: libfuzzer-dotnet-*
+          merge-multiple: true
       - name: Tag
         id: tag
         run: |
           $tag = "v" + (Get-Date).ToString("yyyy.MM.dd.HHmm")
           Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
 
-          git config user.name "${GITHUB_REPOSITORY_OWNER}"
-          git config user.email "${GITHUB_REPOSITORY_OWNER}@users.noreply.github.com"
+          git config user.name "${{ github.repository_owner }}"
+          git config user.email "${{ github.repository_owner }}@users.noreply.github.com"
 
-          git tag -a $tag -m $tag ${GITHUB_SHA}
+          git tag -a $tag -m $tag ${{ github.sha }}
           git push origin $tag
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
             libfuzzer-dotnet-windows.exe
