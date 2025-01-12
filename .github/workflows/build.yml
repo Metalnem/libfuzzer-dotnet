@@ -47,14 +47,14 @@ jobs:
 
   build-debian:
     runs-on: ubuntu-24.04
-    container: debian:bullseye
+    container: debian:bookworm
 
     steps:
       - uses: actions/checkout@v4
       - name: Download LLVM
         run: |
           apt-get update && apt-get install -y lsb-release wget software-properties-common gnupg
-          add-apt-repository 'deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main'
+          add-apt-repository 'deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main'
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
           apt-get update && apt-get install -y clang-18 libfuzzer-18-dev llvm-18 llvm-18-dev
       - name: Build
