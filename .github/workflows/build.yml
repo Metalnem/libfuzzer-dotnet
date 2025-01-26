@@ -45,6 +45,20 @@ jobs:
           name: libfuzzer-dotnet-ubuntu
           path: libfuzzer-dotnet-ubuntu
 
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: clang -Werror -O2 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-macos
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.dotnet-version }}
+      - name: Run libFuzzer tests
+        shell: pwsh
+        run: cp libfuzzer-dotnet-macos libfuzzer-dotnet && .\test.ps1
+
   build-debian:
     runs-on: ubuntu-latest
     container: debian:bookworm
