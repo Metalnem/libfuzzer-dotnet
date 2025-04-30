@@ -47,9 +47,10 @@ static PVOID pBuf;
 
 // Handles for pipes
 HANDLE hst_Rd = NULL;
-HANDLE hst_Wr = NULL;
-HANDLE hctl_Rd = NULL;
 HANDLE hctl_Wr = NULL;
+
+// Information about the child process
+PROCESS_INFORMATION child_pi = {};
 
 static void die(const char *msg)
 {
@@ -57,12 +58,25 @@ static void die(const char *msg)
     exit(1);
 }
 
-static void die_sys(const char *msg)
+static void die_lasterror(const char *msg)
 {
-    char error_msg[256];
-    strerror_s(error_msg, sizeof(error_msg), errno);
+    LPSTR buffer = NULL;
+    DWORD lasterror = GetLastError();
+    DWORD chars = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        lasterror,
+        0, // default language
+        (LPSTR)&buffer, // this looks wrong but FORMAT_MESSAGE_ALLOCATE_BUFFER changes the interpretation of this parameter
+        0,
+        NULL);
 
-    printf("%s: %s\n", msg, error_msg);
+    if (chars == 0) {
+        printf("%s [%#lx]\n", msg, lasterror);
+    } else {
+        printf("%s [%#lx]: %s\n", msg, lasterror, buffer);
+    }
+
     exit(1);
 }
 
@@ -129,14 +143,18 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         die("You must specify the target path by using the --target_path command line flag.");
     }
 
+    HANDLE hst_Wr = NULL;
+    HANDLE hctl_Rd = NULL;
+
     // Create pipes to read status and write size to managed code (`Fuzzer.Libfuzzer.Run`)
     if (!CreatePipe(&hst_Rd, &hst_Wr, &saAttr, 0))
     {
-        die_sys("CreatePipe() failed");
+        die_lasterror("CreatePipe() failed");
     }
+
     if (!CreatePipe(&hctl_Rd, &hctl_Wr, &saAttr, 0))
     {
-        die_sys("CreatePipe() failed");
+        die_lasterror("CreatePipe() failed");
     }
 
     UUID uuid;
@@ -153,15 +171,14 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     hMemFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, MAP_SIZE + DATA_SIZE, sharedMemName);
     if (hMemFile == NULL)
     {
-        die_sys("CreateFileMapping() failed");
+        die_lasterror("CreateFileMapping() failed");
     }
 
     atexit(close_shm);
     pBuf = MapViewOfFile(hMemFile, FILE_MAP_ALL_ACCESS, 0, 0, MAP_SIZE + DATA_SIZE);
     if (pBuf == NULL)
     {
-        CloseHandle(hMemFile);
-        die_sys("MapViewOfFile() failed");
+        die_lasterror("MapViewOfFile() failed");
     }
 
     // Create environment variables for pipes and shared memory to be read by sharpfuzz
@@ -169,24 +186,24 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     TCHAR st_wr_Id[10] = {0};
     if (FAILED(StringCchPrintfA(ctl_rd_Id, sizeof(ctl_rd_Id) - 1, "%d", (UINT_PTR)hctl_Rd)))
     {
-        die_sys("StringCchPrintfA() failed");
+        die("StringCchPrintfA() failed");
     }
     if (FAILED(StringCchPrintfA(st_wr_Id, sizeof(st_wr_Id) - 1, "%d", (UINT_PTR)hst_Wr)))
     {
-        die_sys("StringCchPrintfA() failed");
+        die("StringCchPrintfA() failed");
     }
 
     if (!SetEnvironmentVariable(SHM_ID_VAR, sharedMemName))
     {
-        die_sys("SetEnvironmentVariable() failed setting shared memory ID");
+        die_lasterror("SetEnvironmentVariable() failed setting shared memory ID");
     }
     if (!SetEnvironmentVariable(PIPE_HANDLE_CTL_RD_ID, ctl_rd_Id))
     {
-        die_sys("SetEnvironmentVariable() failed setting control pipe ID");
+        die_lasterror("SetEnvironmentVariable() failed setting control pipe ID");
     }
     if (!SetEnvironmentVariable(PIPE_HANDLE_ST_WR_ID, st_wr_Id))
     {
-        die_sys("SetEnvironmentVariable() failed setting status pipe ID");
+        die_lasterror("SetEnvironmentVariable() failed setting status pipe ID");
     }
 
     // Create a job object to manage the fuzzer process tree.
@@ -220,14 +237,14 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
 
     if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &eli, sizeof(eli)))
     {
-        die_sys("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
+        die_lasterror("failed to set `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`");
     }
 
     // Assign the current process to the job. Later calls to `CreateProcess()` will automatically
     // assign the created child processes to the job object.
     if (!AssignProcessToJobObject(job, GetCurrentProcess()))
     {
-        die_sys("failed to assign `libfuzzer-dotnet` process to job");
+        die_lasterror("failed to assign `libfuzzer-dotnet` process to job");
     }
 
     if (target_arg)
@@ -252,13 +269,13 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
     ZeroMemory(&pi, sizeof(pi));
     if (!CreateProcess(NULL, (LPSTR)target_for_process, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
     {
-        die_sys("CreateProcess() failed");
+        die_lasterror("CreateProcess() failed");
     }
 
     // read status for intialization
     if (!ReadFile(hst_Rd, &status, LEN_FLD_SIZE, &dwRead, NULL))
     {
-        die_sys("ReadFile() failed");
+        die_lasterror("ReadFile() failed");
     }
 
     if (dwRead != LEN_FLD_SIZE)
@@ -266,6 +283,20 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerInitialize(int *argc, char ***argv)
         printf("Short read");
         exit(1);
     }
+
+    // now we're initialized and the process is running
+    child_pi = pi;
+
+    // Close our handles to the pipes we passed to the child process.
+    //
+    // Otherwise, if the child process exits without writing status
+    // we will still be blocked on pipe read and never exit.
+    //
+    // This happens e.g. if the child process throws an exception which
+    // cannot be handled by catch clauses (e.g. AccessViolationException),
+    // or dies for some other reason.
+    CloseHandle(hctl_Rd);
+    CloseHandle(hst_Wr);
 
     return 0;
 }
@@ -292,7 +323,7 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     // write size, read status
     if (!WriteFile(hctl_Wr, &size, LEN_FLD_SIZE, &dwWrite, NULL))
     {
-        die_sys("WriteFile() failed");
+        die_lasterror("WriteFile() failed");
     }
 
     if (dwWrite != LEN_FLD_SIZE)
@@ -305,7 +336,20 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     if (!ReadFile(hst_Rd, &status, LEN_FLD_SIZE, &dwRead, NULL))
     {
-        die_sys("ReadFile() failed");
+        if (GetLastError() == ERROR_BROKEN_PIPE)
+        {
+            DWORD exitCode = 0;
+            if (GetExitCodeProcess(child_pi.hProcess, &exitCode))
+            {
+                printf("SharpFuzz process exited with code %#lx, aborting\n", exitCode);
+            }
+
+            abort(); // child process presumably crashed
+        }
+        else
+        {
+            die_lasterror("ReadFile() failed");
+        }
     }
 
     if (dwRead != LEN_FLD_SIZE)
@@ -313,6 +357,7 @@ FUZZ_EXPORT int __cdecl LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         printf("Short read");
         exit(1);
     }
+
     CopyMemory(__libfuzzer_extra_counters, (PVOID)pBuf, MAP_SIZE);
 
     if (status)
