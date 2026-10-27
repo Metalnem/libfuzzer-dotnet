@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DotNetCliTool Version="2">
+  <Commands>
+    <Command Name="dotnet-libfuzzer" />
+  </Commands>
+  <RuntimeIdentifierPackages>
+    <RuntimeIdentifierPackage RuntimeIdentifier="win-x64" Id="libfuzzer-dotnet.win-x64" />
+    <RuntimeIdentifierPackage RuntimeIdentifier="linux-x64" Id="libfuzzer-dotnet.linux-x64" />
+    <RuntimeIdentifierPackage RuntimeIdentifier="linux-arm64" Id="libfuzzer-dotnet.linux-arm64" />
+    <RuntimeIdentifierPackage RuntimeIdentifier="osx-x64" Id="libfuzzer-dotnet.osx-x64" />
+    <RuntimeIdentifierPackage RuntimeIdentifier="osx-arm64" Id="libfuzzer-dotnet.osx-arm64" />
+  </RuntimeIdentifierPackages>
+</DotNetCliTool>

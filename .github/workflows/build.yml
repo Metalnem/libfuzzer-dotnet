@@ -8,6 +8,8 @@ on:
 
 env:
   dotnet-version: 9.0
+  tool-sdk-version: 10.0
+  tool-version: 0.0.0-ci.${{ github.run_number }}
 
 jobs:
   build-windows:
@@ -45,8 +47,50 @@ jobs:
           name: libfuzzer-dotnet-ubuntu
           path: libfuzzer-dotnet-ubuntu
 
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            artifact: libfuzzer-dotnet-macos-x64
+            output: libfuzzer-dotnet-macos-x64
+          - runner: macos-15
+            artifact: libfuzzer-dotnet-macos-arm64
+            output: libfuzzer-dotnet-macos-arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          clang="$(brew --prefix llvm@18)/bin/clang"
+          sdk="$(xcrun --show-sdk-path)"
+          "$clang" -isysroot "$sdk" -Werror -O2 -c libfuzzer-dotnet.cc -o libfuzzer-dotnet.o
+          "$clang" -isysroot "$sdk" -fsanitize=fuzzer libfuzzer-dotnet.o -o ${{ matrix.output }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.dotnet-version }}
+      - name: Run libFuzzer tests
+        shell: pwsh
+        run: cp ${{ matrix.output }} libfuzzer-dotnet && ./test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.output }}
+
   build-debian:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            artifact: libfuzzer-dotnet-debian
+            output: libfuzzer-dotnet-debian
+          - runner: ubuntu-24.04-arm
+            artifact: libfuzzer-dotnet-debian-arm64
+            output: libfuzzer-dotnet-debian-arm64
+
+    runs-on: ${{ matrix.runner }}
     container: debian:bookworm
 
     steps:
@@ -60,8 +104,95 @@ jobs:
             | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot-keyring.gpg
           apt-get update && apt-get install -y clang-18 libfuzzer-18-dev llvm-18 llvm-18-dev
       - name: Build
-        run: clang-18 -Werror -O2 -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet-debian
+        run: clang-18 -Werror -O2 -fsanitize=fuzzer libfuzzer-dotnet.cc -o ${{ matrix.output }}
       - uses: actions/upload-artifact@v4
         with:
-          name: libfuzzer-dotnet-debian
-          path: libfuzzer-dotnet-debian
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.output }}
+
+  build-tool:
+    needs:
+      - build-windows
+      - build-ubuntu
+      - build-macos
+      - build-debian
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.tool-sdk-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: libfuzzer-dotnet-*
+          path: artifacts/native
+          merge-multiple: true
+      - name: Pack .NET tool
+        shell: pwsh
+        run: |
+          dotnet msbuild src/LibFuzzer.DotNet.Tool `
+            -t:PackTool `
+            -p:Configuration=Release `
+            -p:ToolPackageVersion=${{ env.tool-version }} `
+            -p:NativeArtifactsPath="$PWD/artifacts/native" `
+            -p:PackageOutputPath="$PWD/artifacts/package"
+      - name: Test .NET tool
+        shell: pwsh
+        run: |
+          $toolPath = Join-Path $PWD ".tools"
+          dotnet tool install `
+            --tool-path $toolPath `
+            --add-source artifacts/package `
+            --version ${{ env.tool-version }} `
+            libfuzzer-dotnet
+          $env:PATH = "$toolPath$([IO.Path]::PathSeparator)$env:PATH"
+          ./test.ps1 -LibFuzzer dotnet-libfuzzer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libfuzzer-dotnet-nuget
+          path: artifacts/package/*.nupkg
+
+  test-tool:
+    needs: build-tool
+    strategy:
+      matrix:
+        runner:
+          - windows-latest
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-15-intel
+          - macos-15
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.tool-sdk-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: libfuzzer-dotnet-nuget
+          path: artifacts/package
+      - name: Test .NET tool commands
+        shell: pwsh
+        run: |
+          $toolPath = Join-Path $PWD ".tools"
+          dotnet tool install `
+            --tool-path $toolPath `
+            --add-source artifacts/package `
+            --version ${{ env.tool-version }} `
+            libfuzzer-dotnet
+
+          $env:PATH = "$toolPath$([IO.Path]::PathSeparator)$env:PATH"
+          $directOutput = (dotnet-libfuzzer 2>&1) -join [Environment]::NewLine
+
+          if ($LASTEXITCODE -ne 1 -or -not $directOutput.Contains("You must specify the target path")) {
+            throw "Direct tool invocation failed: $directOutput"
+          }
+
+          $dotnetOutput = (dotnet libfuzzer 2>&1) -join [Environment]::NewLine
+
+          if ($LASTEXITCODE -ne 1 -or -not $dotnetOutput.Contains("You must specify the target path")) {
+            throw "dotnet tool invocation failed: $dotnetOutput"
+          }
