@@ -21,8 +21,13 @@
 #define CTL_FD_VAR "__LIBFUZZER_CONTROL_PIPE_ID"
 #define ST_FD_VAR "__LIBFUZZER_STATUS_PIPE_ID"
 
+#if defined(__APPLE__)
+uint8_t extra_counters[MAP_SIZE];
+extern "C" void __sanitizer_cov_8bit_counters_init(uint8_t *start, uint8_t *end);
+#else
 __attribute__((weak, section("__libfuzzer_extra_counters")))
 uint8_t extra_counters[MAP_SIZE];
+#endif
 
 static const char *target_path_name = "--target_path";
 static const char *target_arg_name = "--target_arg";
@@ -91,6 +96,10 @@ static void parse_flags(int argc, char **argv)
 // memory segment for the communication between the parent and the child.
 extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
 {
+#if defined(__APPLE__)
+    __sanitizer_cov_8bit_counters_init(extra_counters, extra_counters + MAP_SIZE);
+#endif
+
     parse_flags(*argc, *argv);
 
     if (!target_path)
@@ -142,7 +151,7 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
         close(st_pipe[1]);
 
         char shm_str[12];
-        sprintf(shm_str, "%d", shm_id);
+        snprintf(shm_str, sizeof(shm_str), "%d", shm_id);
 
         if (setenv(SHM_ID_VAR, shm_str, 1))
         {
@@ -260,7 +269,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     if (status)
     {
+#if defined(__APPLE__)
+        remove_shm();
+        abort();
+#else
         __builtin_trap();
+#endif
     }
 
     return 0;

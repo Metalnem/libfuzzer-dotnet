@@ -45,6 +45,38 @@ jobs:
           name: libfuzzer-dotnet-ubuntu
           path: libfuzzer-dotnet-ubuntu
 
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            artifact: libfuzzer-dotnet-macos-x64
+            output: libfuzzer-dotnet-macos-x64
+          - runner: macos-15
+            artifact: libfuzzer-dotnet-macos-arm64
+            output: libfuzzer-dotnet-macos-arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          clang="$(brew --prefix llvm@18)/bin/clang"
+          sdk="$(xcrun --show-sdk-path)"
+          "$clang" -isysroot "$sdk" -Werror -O2 -c libfuzzer-dotnet.cc -o libfuzzer-dotnet.o
+          "$clang" -isysroot "$sdk" -fsanitize=fuzzer libfuzzer-dotnet.o -o ${{ matrix.output }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.dotnet-version }}
+      - name: Run libFuzzer tests
+        shell: pwsh
+        run: cp ${{ matrix.output }} libfuzzer-dotnet && ./test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.output }}
+
   build-debian:
     runs-on: ubuntu-latest
     container: debian:bookworm
