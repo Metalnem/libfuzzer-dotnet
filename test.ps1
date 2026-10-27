@@ -1,3 +1,7 @@
+param(
+    [string] $LibFuzzer = "./libfuzzer-dotnet"
+)
+
 dotnet tool install --global SharpFuzz.CommandLine
 
 dotnet publish tests/Library.Fuzz -c release -o out
@@ -6,7 +10,7 @@ sharpfuzz out/Library.dll
 mkdir corpus
 $outputPath = "output.txt"
 
-.\libfuzzer-dotnet --target_path=dotnet --target_arg=out/Library.Fuzz.dll corpus 2>&1 `
+& $LibFuzzer --target_path=dotnet --target_arg=out/Library.Fuzz.dll corpus 2>&1 `
 | Tee-Object -FilePath $outputPath
 
 $output = Get-Content -Path $outputPath -Raw

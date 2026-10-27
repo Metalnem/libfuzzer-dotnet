@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+    <NativeArtifactsPath Condition="'$(NativeArtifactsPath)' == ''">$(MSBuildProjectDirectory)/../../artifacts/native</NativeArtifactsPath>
+    <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(MSBuildProjectDirectory)/../../artifacts/package</PackageOutputPath>
+
+    <NuspecFile Condition="'$(ToolRid)' == ''">$(MSBuildProjectDirectory)/libfuzzer-dotnet.nuspec</NuspecFile>
+    <NuspecFile Condition="'$(ToolRid)' != ''">$(MSBuildProjectDirectory)/libfuzzer-dotnet.rid.nuspec</NuspecFile>
+    <SettingsFile Condition="'$(SettingsFile)' == ''">$(MSBuildProjectDirectory)/DotnetToolSettings.xml</SettingsFile>
+    <NuspecProperties Condition="'$(ToolRid)' == ''">version=$(PackageVersion);settings=$(SettingsFile)</NuspecProperties>
+    <NuspecProperties Condition="'$(ToolRid)' != ''">version=$(PackageVersion);rid=$(ToolRid);settings=$(SettingsFile);artifact=$(NativeArtifact);entrypoint=$(EntryPoint)</NuspecProperties>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <NativeToolPackage Include="win-x64"
+                       Artifact="libfuzzer-dotnet-windows.exe"
+                       EntryPoint="libfuzzer-dotnet.exe"
+                       Settings="DotnetToolSettings.windows.xml" />
+    <NativeToolPackage Include="linux-x64"
+                       Artifact="libfuzzer-dotnet-debian"
+                       EntryPoint="libfuzzer-dotnet"
+                       Settings="DotnetToolSettings.unix.xml" />
+    <NativeToolPackage Include="linux-arm64"
+                       Artifact="libfuzzer-dotnet-debian-arm64"
+                       EntryPoint="libfuzzer-dotnet"
+                       Settings="DotnetToolSettings.unix.xml" />
+    <NativeToolPackage Include="osx-x64"
+                       Artifact="libfuzzer-dotnet-macos-x64"
+                       EntryPoint="libfuzzer-dotnet"
+                       Settings="DotnetToolSettings.unix.xml" />
+    <NativeToolPackage Include="osx-arm64"
+                       Artifact="libfuzzer-dotnet-macos-arm64"
+                       EntryPoint="libfuzzer-dotnet"
+                       Settings="DotnetToolSettings.unix.xml" />
+  </ItemGroup>
+
+  <Target Name="PackTool">
+    <Error Condition="'$(ToolPackageVersion)' == ''"
+           Text="ToolPackageVersion must be specified." />
+    <Error Condition="!Exists('$(NativeArtifactsPath)/%(NativeToolPackage.Artifact)')"
+           Text="Missing native artifact: $(NativeArtifactsPath)/%(NativeToolPackage.Artifact)" />
+
+    <MakeDir Directories="$(PackageOutputPath)" />
+
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Pack"
+             BuildInParallel="false"
+             Properties="Configuration=$(Configuration);PackageVersion=$(ToolPackageVersion);PackageOutputPath=$(PackageOutputPath);ToolRid=%(NativeToolPackage.Identity);NativeArtifact=$(NativeArtifactsPath)/%(NativeToolPackage.Artifact);EntryPoint=%(NativeToolPackage.EntryPoint);SettingsFile=$(MSBuildProjectDirectory)/%(NativeToolPackage.Settings)" />
+
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Pack"
+             BuildInParallel="false"
+             Properties="Configuration=$(Configuration);PackageVersion=$(ToolPackageVersion);PackageOutputPath=$(PackageOutputPath);SettingsFile=$(MSBuildProjectDirectory)/DotnetToolSettings.xml" />
+  </Target>
+
+</Project>

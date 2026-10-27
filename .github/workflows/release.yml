@@ -5,19 +5,47 @@ on:
   push:
     branches: ["master"]
     paths:
+      - '.github/workflows/build.yml'
+      - '.github/workflows/release.yml'
       - 'libfuzzer-dotnet-windows.cc'
       - 'libfuzzer-dotnet.cc'
+      - 'src/LibFuzzer.DotNet.Tool/**'
+      - 'test.ps1'
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      package: ${{ steps.version.outputs.package }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Generate version
+        id: version
+        run: |
+          year="$(date -u +'%Y')"
+          month="$((10#$(date -u +'%m')))"
+          day="$((10#$(date -u +'%d')))"
+          time="$((10#$(date -u +'%H%M')))"
+          echo "package=$year.$month.$day.$time" >> "$GITHUB_OUTPUT"
+          echo "tag=v$(date -u +'%Y.%m.%d.%H%M')" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     uses: ./.github/workflows/build.yml
+    with:
+      package_version: ${{ needs.version.outputs.package }}
 
   release:
     runs-on: windows-latest
-    needs: build
+    needs:
+      - version
+      - build
 
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -25,11 +53,20 @@ jobs:
         with:
           pattern: libfuzzer-dotnet-*
           merge-multiple: true
+      - name: Trusted publishing is not configured
+        if: vars.NUGET_USER == ''
+        run: >
+          Write-Warning
+          "NUGET_USER is not configured. The GitHub release will be created, but the packages will not be published to NuGet.org."
+      - name: Log in to NuGet.org
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        id: nuget
+        with:
+          user: ${{ vars.NUGET_USER }}
       - name: Tag
-        id: tag
         run: |
-          $tag = "v" + (Get-Date).ToString("yyyy.MM.dd.HHmm")
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+          $tag = "${{ needs.version.outputs.tag }}"
 
           git config user.name "${{ github.repository_owner }}"
           git config user.email "${{ github.repository_owner }}@users.noreply.github.com"
@@ -42,4 +79,29 @@ jobs:
             libfuzzer-dotnet-windows.exe
             libfuzzer-dotnet-ubuntu
             libfuzzer-dotnet-debian
-          tag_name: ${{ steps.tag.outputs.tag }}
+            libfuzzer-dotnet-debian-arm64
+            libfuzzer-dotnet-macos-x64
+            libfuzzer-dotnet-macos-arm64
+            libfuzzer-dotnet*.nupkg
+          tag_name: ${{ needs.version.outputs.tag }}
+      - name: Publish .NET tool to NuGet.org
+        if: vars.NUGET_USER != ''
+        run: |
+          $version = "${{ needs.version.outputs.package }}"
+          $apiKey = "${{ steps.nuget.outputs.NUGET_API_KEY }}"
+          $source = "https://api.nuget.org/v3/index.json"
+          $rids = @("win-x64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64")
+
+          foreach ($rid in $rids) {
+            dotnet nuget push "libfuzzer-dotnet.$rid.$version.nupkg" `
+              --api-key $apiKey `
+              --source $source
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          dotnet nuget push "libfuzzer-dotnet.$version.nupkg" `
+            --api-key $apiKey `
+            --source $source

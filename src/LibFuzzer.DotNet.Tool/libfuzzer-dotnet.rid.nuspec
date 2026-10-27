@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>libfuzzer-dotnet.$rid$</id>
+    <version>$version$</version>
+    <authors>Metalnem</authors>
+    <description>libFuzzer driver for SharpFuzz ($rid$).</description>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/Metalnem/libfuzzer-dotnet</projectUrl>
+    <repository type="git" url="https://github.com/Metalnem/libfuzzer-dotnet.git" />
+    <tags>libfuzzer fuzzing sharpfuzz</tags>
+    <packageTypes>
+      <packageType name="DotnetToolRidPackage" />
+    </packageTypes>
+  </metadata>
+  <files>
+    <file src="$settings$" target="tools/any/$rid$/DotnetToolSettings.xml" />
+    <file src="$artifact$" target="tools/any/$rid$/$entrypoint$" />
+  </files>
+</package>
