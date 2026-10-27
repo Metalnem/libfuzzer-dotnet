@@ -6,6 +6,10 @@
 #include "string.h"
 #include "unistd.h"
 #include <sys/shm.h>
+#ifdef __linux__
+#include <signal.h>
+#include <sys/prctl.h>
+#endif
 
 #define _STR(x) #x
 #define STR(x) _STR(x)
@@ -122,6 +126,10 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
         die_sys("shmat() failed");
     }
 
+#ifdef __linux__
+    pid_t parent_pid = getpid();
+#endif
+
     child_pid = fork();
 
     if (child_pid < 0)
@@ -131,6 +139,18 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
 
     if (!child_pid)
     {
+#ifdef __linux__
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
+        {
+            die_sys("prctl() failed");
+        }
+
+        if (getppid() != parent_pid)
+        {
+            _exit(1);
+        }
+#endif
+
         if (dup2(ctl_pipe[0], CTL_FD) < 0 || dup2(st_pipe[1], ST_FD) < 0)
         {
             die_sys("dup() failed");
