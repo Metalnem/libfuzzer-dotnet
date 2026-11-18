@@ -142,7 +142,7 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv)
         close(st_pipe[1]);
 
         char shm_str[12];
-        sprintf(shm_str, "%d", shm_id);
+        snprintf(shm_str, sizeof(shm_str), "%d", shm_id);
 
         if (setenv(SHM_ID_VAR, shm_str, 1))
         {
